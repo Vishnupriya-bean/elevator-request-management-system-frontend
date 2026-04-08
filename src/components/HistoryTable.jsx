@@ -3,9 +3,9 @@ function formatTime(dt) {
 }
 
 const BADGE = {
-  pending:     "badge-yellow",
+  pending: "badge-yellow",
   in_progress: "badge-blue",
-  done:        "badge-green",
+  done: "badge-green",
 };
 
 export default function HistoryTable({ history }) {
@@ -32,7 +32,7 @@ export default function HistoryTable({ history }) {
                 <tr key={r.id}>
                   <td className="td-id">{r.id}</td>
                   <td>{r.username}</td>
-                  <td className="td-floor">{r.from_floor}</td>
+                  <td className="td-floor">{r.floor}</td>
                   <td>
                     <span className={`badge ${BADGE[r.status] || ""}`}>
                       {r.status.replace("_", " ")}

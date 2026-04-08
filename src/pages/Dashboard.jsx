@@ -1,21 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import ElevatorDisplay from "../components/ElevatorDisplay";
-import RequestForm     from "../components/RequestForm";
-import QueuePanel      from "../components/QueuePanel";
-import HistoryTable    from "../components/HistoryTable";
+import RequestForm from "../components/RequestForm";
+import QueuePanel from "../components/QueuePanel";
+import HistoryTable from "../components/HistoryTable";
 import "../styles/dashboard.css";
 
-const POLL_MS = 2000;
+const POLL_MS = 500;
 
 export default function Dashboard() {
-  const navigate  = useNavigate();
-  const username  = localStorage.getItem("username") || "user";
+  const navigate = useNavigate();
+  // api base url depends on environment
+  const username = localStorage.getItem("username") || "user";
 
-  const [status, setStatus]   = useState({ currentFloor: 1, isMoving: false, queue: [] });
+  const [status, setStatus] = useState({ currentFloor: 1, isMoving: false, direction: 'idle', nextStop: null, queueCount: 0, queue: [] });
   const [history, setHistory] = useState([]);
-  const [toast, setToast]     = useState("");
+  const [toast, setToast] = useState(null);
+  const prevStatus = useRef(status);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -41,6 +43,19 @@ export default function Dashboard() {
     fetchHistory();
   }, [fetchStatus, fetchHistory]);
 
+  useEffect(() => {
+    const prev = prevStatus.current;
+    if (prev && !prev.isMoving && status.isMoving) {
+      showToast(`Moving from ${prev.currentFloor} → ${status.nextStop ?? "…"}`);
+    }
+
+    if (prev && prev.isMoving && !status.isMoving && prev.currentFloor !== status.currentFloor) {
+      showToast(`Door opened at floor ${status.currentFloor}`);
+    }
+
+    prevStatus.current = status;
+  }, [status]);
+
   // poll status every 2s
   useEffect(() => {
     const id = setInterval(() => {
@@ -50,10 +65,11 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [fetchStatus, fetchHistory]);
 
-  async function handleRequest(floor) {
+  async function handleRequest(request) {
     try {
-      await api.post("/elevator/request", { floor });
-      showToast(`elevator requested to floor ${floor}`);
+      await api.post("/elevator/request", request);
+      const typeLabel = request.requestType === "cabin" ? "destination" : `${request.direction} call`;
+      showToast(`Request added to floor ${request.floor} (${typeLabel})`);
       fetchStatus();
     } catch (err) {
       showToast(err.response?.data?.error || "request failed", true);
@@ -91,10 +107,13 @@ export default function Dashboard() {
           <ElevatorDisplay
             currentFloor={status.currentFloor}
             isMoving={status.isMoving}
+            direction={status.direction}
+            nextStop={status.nextStop}
+            queueCount={status.queueCount}
             queue={status.queue}
           />
           <div className="dash-right-col">
-            <RequestForm onRequest={handleRequest} />
+            <RequestForm onRequest={handleRequest} queue={status.queue} />
             <QueuePanel queue={status.queue} />
           </div>
         </div>
